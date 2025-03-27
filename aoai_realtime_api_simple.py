@@ -33,18 +33,19 @@ async def main():
     logger.info("Connected to AOAI WebSocket")
     
     session_id = None
-    # conversation_history = []
     last_item_id = None
 
     # Wait for session to be created
     msg = await ws_client.recv()
     data = json.loads(msg)
+    session_id = data["session"]["id"]
+
     print(data)
     logger.info(data["type"])
-    session_id = data["session"]["id"]
     logger.info(f"Session ID: {session_id}")
 
-    # Set System prompt
+    # Configure Session
+    # Set modalities and system prompt (instructions)
     await ws_client.send(json.dumps(
       {
         "type": "session.update",
@@ -55,38 +56,41 @@ async def main():
       })
     )
 
-    turn = 1
 
     while True:
       user_input = input("Enter your message: ")
       if user_input == "exit":
         await ws_client.close(1000, "Close connection")
-      
-      user_msg_id = str(uuid.uuid4())[:32]
 
       # Add message to the conversation history
       await ws_client.send(json.dumps(
         {
           "type": "conversation.item.create",
           "item": {
-            "id": user_msg_id,
+            "id": str(uuid.uuid4())[:32],
             "type": "message",
             "role": "user",
             "content": [{
               "type": "input_text",
               "text": user_input
             }]
-          }
+          },
+          "previous_item_id": last_item_id,
         })
       )
 
       # Wait for item created confirmation
-      # while True:
-      #   msg = await ws_client.recv()
-      #   data = json.loads(msg)
-      #   if data["type"] == "conversation.item.created":
-      #     last_item_id = data["item"]["id"]
-      #     break
+      while True:
+        msg = await ws_client.recv()
+        data = json.loads(msg)
+
+        match data["type"]:
+          case "conversation.item.created":
+            last_item_id = data["item"]["id"]
+
+        if data["type"] == "conversation.item.created":
+          last_item_id = data["item"]["id"]
+          break
       
 
       # Request response from the server
@@ -97,22 +101,23 @@ async def main():
         }
       }))
 
+
       # Wait for response
-      response_text = ""
-      while True:
+      done = False
+      while not done:
         msg = await ws_client.recv()
         data = json.loads(msg)
-        if data["type"] == "response.done":
-          break
-        elif data["type"] == "response.text.delta":
-          response_text += data["delta"]
-        elif data["type"] == "error":
-          print(f"Error: {data['error']}")
-          break
 
-      # Print the response
-      print(f"Response: {response_text}")
-      turn += 1
+        match data["type"]:
+          case "response.done":
+            done = True
+            print("\n")
+          case " response.text.delta":
+            # Use this to stream the response
+            print(data["delta"], end="")
+          case "error":
+            done = True
+            logger.error(data["error"])
 
 
 if __name__ == "__main__":
