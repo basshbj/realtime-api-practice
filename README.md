@@ -40,7 +40,7 @@ List of the available events.
 | input_audio_buffer.speech_started                       | Returned in `server_vad` mode when a speech is detected in the input buffer       |
 | input_audio_buffer.speech_stopped                       | Returned in `server_vad` mode when the server detectes that the end of the speech |
 | rate_limits.updated                                     | - Emitted at the beginning of a response </br> - Indicates the updated rate limit |
-| response.audio.delte                                    | Returned when the generated audio is updated                                      |
+| response.audio.delta                                    | Returned when the generated audio is updated                                      |
 | response.audio.done                                     | Returned when the generated audio is done                                         |
 | response.auido_transcript.delta                         | Returned when the generated transcript is updated                                 |
 | response.auido_transcript.done                          | Returned when the generated transcript is done                                    |
