@@ -2,16 +2,15 @@ import asyncio
 import websockets
 import json
 import os
-import uuid
-import queue
 import threading
-import pyaudio
 import base64
-import time
 from dotenv import load_dotenv
 from utils.mylogger import MyLogger
+from utils.state import StateForAudio
+from src.iomanager import IOType, IOManager, IOAufioConfig
 
 # ---- Set environment ----
+state = StateForAudio()
 logger = MyLogger("")
 
 load_dotenv()
@@ -21,51 +20,6 @@ HOST_URL = f"wss://{os.getenv("AOAI_RESOURCE_NAME")}.openai.azure.com/openai/rea
 HEADERS = {
   "api-key": os.getenv("AOAI_API_KEY")
 }
-
-input_queue = queue.Queue()
-output_queue = queue.Queue()
-
-
-# ---- I/O Settings ----
-# Input
-INPUT_FORMAT = pyaudio.paInt16
-INPUT_CHANNELS = 1
-INPUT_RATE = 24000
-INPUT_CHUNK_SIZE = 1024
-
-# Output
-OUTPUT_FORMAT = pyaudio.paInt16
-OUTPUT_CHANNELS = 1
-OUTPUT_RATE = 24000
-OUTPUT_CHUNK_SIZE = 1024
-
-
-# ---- Gloval variables ----
-IS_PLAYING = False
-IS_START_SPEAKING = False
-
-
-# ---- Input/Output ----
-def play_output(output_stream):
-  while True:
-    audio_data = output_queue.get()
-    
-    if audio_data is None:
-      continue
-
-    logger.warning("PLAYING NEW AUDIO CHUNK")
-
-    output_stream.write(audio_data)
-
-def listen_for_input(input_stream):
-  while True:
-    audio_data = input_stream.read(INPUT_CHUNK_SIZE, exception_on_overflow=False)
-    
-    if audio_data is None:
-      continue
-
-    base64_audio = base64.b64encode(audio_data).decode("utf-8")
-    input_queue.put(base64_audio)
 
 
 # ---- Helper functions ----
@@ -90,7 +44,7 @@ async def receive_message(websocket, logger):
       case "response.output_item.done":
         pass
       case "response.text.delta":
-        output_queue.put(data["delta"])
+        state.output_queue.put(data["delta"])
       case "response.text.done":
         print("")
         logger.log_receive(data["type"])
@@ -100,8 +54,8 @@ async def receive_message(websocket, logger):
         audio_data = base64.b64decode(data["delta"])
         # output_queue.put(audio_data)
 
-        for i in range(0, len(audio_data), OUTPUT_CHUNK_SIZE):
-          output_queue.put(audio_data[i:i+OUTPUT_CHUNK_SIZE])
+        for i in range(0, len(audio_data), IOAufioConfig.OUTPUT_CHUNK_SIZE):
+          state.output_queue.put(audio_data[i:i+IOAufioConfig.OUTPUT_CHUNK_SIZE])
       case "response.audio.done":
         IS_PLAYING = False
         logger.log_receive(data["type"])
@@ -115,13 +69,13 @@ async def send_message(websocket):
   done = False
 
   while not done:
-    if input_queue.empty():
+    if state.input_queue.empty():
       continue
 
-    if IS_PLAYING and IS_START_SPEAKING:
+    if state.IS_PLAYING and state.IS_START_SPEAKING:
       IS_START_SPEAKING = False
 
-      output_queue.queue.clear()
+      state.output_queue.queue.clear()
       # Cancel the current response
       cancel_response = {
         "type": "response.cancel",
@@ -131,13 +85,12 @@ async def send_message(websocket):
       # Truncate response
       truncate_response = {
         "type": "conversation.item.truncate",
-        #"item_id": "<item_id>",
         "content_index": 0,
         "audio_end_ms": 0
       }
       await websocket.send(json.dumps(truncate_response))
 
-    base64_audio = await asyncio.get_event_loop().run_in_executor(None, input_queue.get)
+    base64_audio = await asyncio.get_event_loop().run_in_executor(None, state.input_queue.get)
 
     input_buffer_append = {
       "type": "input_audio_buffer.append",
@@ -145,8 +98,6 @@ async def send_message(websocket):
     }
 
     await websocket.send(json.dumps(input_buffer_append))
-
-    #await asyncio.sleep(0.1)
 
 
 # ---- Main function ----
@@ -178,35 +129,12 @@ async def main():
       }
     }
 
-    audio = pyaudio.PyAudio()
-
-    input_stream = audio.open(
-        format=INPUT_FORMAT,
-        channels=INPUT_CHANNELS ,
-        rate=INPUT_RATE,
-        input=True,
-        output=False,
-        frames_per_buffer=INPUT_CHUNK_SIZE,
-        start=False,
-    )
-
-    output_stream = audio.open(
-        format=OUTPUT_FORMAT,
-        channels=OUTPUT_CHANNELS,
-        rate=OUTPUT_RATE,
-        input=False,
-        output=True,
-        frames_per_buffer=OUTPUT_CHUNK_SIZE,
-        start=False,
-    )
-
-    input_stream.start_stream()
-    output_stream.start_stream()
+    io_manager = IOManager(IOType.AUDIO, state, logger)
 
     await websocket.send(json.dumps(session_config))
 
-    threading.Thread(target=listen_for_input, args=(input_stream,), daemon=True).start()
-    threading.Thread(target=play_output, args=(output_stream,), daemon=True).start()
+    threading.Thread(target=io_manager.get_input, daemon=True).start()
+    threading.Thread(target=io_manager.set_output, daemon=True).start()
 
     # Create tasks for send and receive messages
     receive_task = asyncio.create_task(receive_message(websocket, logger))

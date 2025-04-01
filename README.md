@@ -49,7 +49,7 @@ List of the available events.
 | response.created                                        | Returned when a new response is created. Response is `in_progress` state          |
 | response.done                                           | Returned when a response is done streaming                                        |
 | response.function_call_arguments.delta                  | Returned when the generated function call arguments are updated                   |
-| response.function_call_arguments.delta                  | Returned when the generated function call arguments are done streaming            |
+| response.function_call_arguments.done                   | Returned when the generated function call arguments are done streaming            |
 | response.output_item.added                              | Returned when a new item is created during response generation                    |
 | response.output_item.done                               | Returned when a response item done streaming                                      |
 | response.text.delta                                     | Returned when the generated text is updated                                       |

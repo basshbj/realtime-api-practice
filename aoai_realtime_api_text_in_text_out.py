@@ -3,12 +3,13 @@ import websockets
 import json
 import os
 import uuid
-import queue
 import threading
 from dotenv import load_dotenv
 from utils.mylogger import MyLogger
+from utils.state import StateForText
 
 # ---- Set environment ----
+state = StateForText()
 logger = MyLogger("")
 
 load_dotenv()
@@ -19,22 +20,7 @@ HEADERS = {
   "api-key": os.getenv("AOAI_API_KEY")
 }
 
-input_queue = queue.Queue()
-output_queue = queue.Queue()
-
 # ---- Helper functions ----
-def print_output():
-  while True:
-    if not output_queue.empty():
-      output = output_queue.get()
-      print(output, end="", flush=True)    
-
-def get_input():
-  while True:
-    user_input = input("")
-    input_queue.put(user_input)
-    
-
 async def receive_message(websocket, logger):
   done = False
 
@@ -50,7 +36,7 @@ async def receive_message(websocket, logger):
       case "response.output_item.done":
         pass
       case "response.text.delta":
-        output_queue.put(data["delta"])
+        state.output_queue.put(data["delta"])
       case "response.text.done":
         print("")
         logger.log_receive(data["type"])
@@ -65,10 +51,10 @@ async def send_message(websocket):
   done = False
 
   while not done:
-    if input_queue.empty():
+    if state.input_queue.empty():
       continue
 
-    input = input_queue.get()
+    input = await asyncio.get_event_loop().run_in_executor(None, state.input_queue.get)
 
     if input.lower() == "exit":
       #done = True
@@ -121,8 +107,8 @@ async def main():
 
     await websocket.send(json.dumps(session_config))
 
-    threading.Thread(target=get_input, daemon=True).start()
-    threading.Thread(target=print_output, daemon=True).start()
+    threading.Thread(target=state.get_input, daemon=True).start()
+    threading.Thread(target=state.print_output, daemon=True).start()
 
     # Create tasks for send and receive messages
     receive_task = asyncio.create_task(receive_message(websocket, logger))
