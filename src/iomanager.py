@@ -1,4 +1,3 @@
-import queue
 import pyaudio
 import base64
 

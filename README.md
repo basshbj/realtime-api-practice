@@ -28,7 +28,7 @@ List of the available events.
 
 | Event                                                   | Description                                                                       |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| conversation.create                                     | - Returned after the session is created </br> - One conversation per session      |
+| conversation.created                                    | - Returned after the session is created </br> - One conversation per session      |
 | conversation.item.created                               | Returned when a conversation item is created                                      |
 | conversation.item.deleted                               | Returned when the client deletes an item                                          |
 | conversation.item.input_audio_transcription.completed   | Resull of the audio transcription for the audio input                             |
@@ -36,14 +36,14 @@ List of the available events.
 | conversation.item.truncated                             | Returned when the client truncates an item                                        |
 | error                                                   | Returned when an error ocurred (client or server)                                 |
 | input_audio_buffer.cleared                              | Returned when the client clears the input audio buffer                            |
-| input_audio_buffer.commited                             | Returned when the client commits the input audio buffer                           |
+| input_audio_buffer.committed                            | Returned when the client commits the input audio buffer                           |
 | input_audio_buffer.speech_started                       | Returned in `server_vad` mode when a speech is detected in the input buffer       |
 | input_audio_buffer.speech_stopped                       | Returned in `server_vad` mode when the server detectes that the end of the speech |
 | rate_limits.updated                                     | - Emitted at the beginning of a response </br> - Indicates the updated rate limit |
 | response.audio.delta                                    | Returned when the generated audio is updated                                      |
 | response.audio.done                                     | Returned when the generated audio is done                                         |
-| response.auido_transcript.delta                         | Returned when the generated transcript is updated                                 |
-| response.auido_transcript.done                          | Returned when the generated transcript is done                                    |
+| response.audio_transcript.delta                         | Returned when the generated transcript is updated                                 |
+| response.audio_transcript.done                          | Returned when the generated transcript is done                                    |
 | response.content_part.added                             | Returned when a new content part is added to the assistant message                |
 | response.content_part.done                              | Returned when a content part is done streaming                                    |
 | response.created                                        | Returned when a new response is created. Response is `in_progress` state          |
