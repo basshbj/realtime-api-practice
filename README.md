@@ -73,7 +73,9 @@ sequenceDiagram
   S ->> C: conversation.item.created
   C ->>+ S: response.create
   S ->> C: response.created
-  S -->> C: response.text.delta
+  loop While Generation Answer
+    S -->> C: response.text.delta
+  end
   S -->> C: response.text.done
   S ->>- C: response.done
 
